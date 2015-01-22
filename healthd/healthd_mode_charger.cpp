@@ -78,6 +78,13 @@ char *locale;
 #define BLUE_LED_PATH           "/sys/class/leds/blue/brightness"
 #define BACKLIGHT_PATH          "/sys/class/leds/lcd-backlight/brightness"
 #define CHARGING_ENABLED_PATH   "/sys/class/power_supply/battery/charging_enabled"
+#define CHARGER_LIGHT_PATH "/sys/class/leds/charger_light/brightness"
+
+#define CHARGER_LIGHT_ON 1
+#define CHARGER_LIGHT_OFF 0
+#define BAT_FULL 100
+#define BAT_LOW  0
+
 
 #define LOGE(x...) do { KLOG_ERROR("charger", x); } while (0)
 #define LOGI(x...) do { KLOG_INFO("charger", x); } while (0)
@@ -204,6 +211,7 @@ struct soc_led_color_mapping soc_leds[3] = {
 };
 
 static struct charger charger_state;
+static bool old_chg_light_status = 0;
 
 static int char_width;
 static int char_height;
@@ -286,6 +294,36 @@ cleanup:
         close(fd);
 
     return 0;
+}
+static int set_charger_light(int status)
+{
+    int fd = -1, ret = -1;
+    char buf[10];
+
+    memset(buf, 0, sizeof(buf));
+    fd = open(CHARGER_LIGHT_PATH, O_RDWR);
+    if(fd < 0) {
+        LOGE("open charger light path error: %s \n", strerror(errno));
+	goto out;
+    }
+
+    if (status) {
+        LOGE("Enable charger light \n");
+	snprintf(buf, sizeof(status), "%d", CHARGER_LIGHT_ON);
+    } else {
+        LOGE("Disable charger light \n");
+	snprintf(buf, sizeof(status), "%d", CHARGER_LIGHT_OFF);
+    }
+    if (write(fd, buf,strlen(buf)) < 0) {
+        LOGE("write charger light brightness error:%s",strerror(errno));
+	close(fd);
+	goto out;
+    }
+    close(fd);
+
+    ret = 0;
+out:
+    return ret;
 }
 
 /* current time in milliseconds */
@@ -532,12 +570,28 @@ static void update_screen_state(struct charger *charger, int64_t now)
     struct animation *batt_anim = charger->batt_anim;
     int cur_frame;
     int disp_time;
+	int batt_cap;
+    bool chg_light_status;
+
+    batt_cap = get_battery_capacity();
+    if (batt_cap > BAT_LOW && batt_cap < BAT_FULL)
+	chg_light_status = true;
+    else
+	chg_light_status = false;
+
+    if (old_chg_light_status != chg_light_status) {
+	old_chg_light_status = chg_light_status;
+	if (chg_light_status)
+            set_charger_light(CHARGER_LIGHT_ON);
+        else
+            set_charger_light(CHARGER_LIGHT_OFF);
+    }
 
     if (!batt_anim->run || now < charger->next_screen_transition)
         return;
 
     if (!minui_inited) {
-        int batt_cap = get_battery_capacity();
+            batt_cap = get_battery_capacity();
 
         if (batt_cap < SCREEN_ON_BATTERY_THRESH) {
             LOGV("[%" PRId64 "] level %d, leave screen off\n", now, batt_cap);
@@ -884,6 +938,7 @@ void healthd_mode_charger_init(struct healthd_config* /*config*/)
     struct charger *charger = &charger_state;
     int i;
     int epollfd;
+	int bat_cap;
 
     dump_last_kmsg();
 
@@ -932,6 +987,16 @@ void healthd_mode_charger_init(struct healthd_config* /*config*/)
     }
 
     ev_sync_key_state(set_key_callback, charger);
+	
+    bat_cap = get_battery_capacity();
+    if (bat_cap > BAT_LOW && bat_cap < BAT_FULL) {
+	old_chg_light_status = true;
+        set_charger_light(CHARGER_LIGHT_ON);
+    }
+    else {
+	old_chg_light_status = false;
+        set_charger_light(CHARGER_LIGHT_OFF);
+    }
 
     charger->next_screen_transition = -1;
     charger->next_key_check = -1;
