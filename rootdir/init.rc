@@ -327,6 +327,8 @@ on post-fs-data
     # Set indication (checked by vold) that we have finished this action
     #setprop vold.post_fs_data_done 1
 
+	mkdir /data/nfc
+	mkdir /etc/param
 on boot
     # basic network init
     ifup lo
@@ -399,6 +401,7 @@ on boot
     chown system system /sys/class/leds/torch-light/brightness
     chown system system /sys/class/leds/button-backlight/brightness
     chown system system /sys/class/leds/jogball-backlight/brightness
+    chown system system /sys/class/leds/charger_light/brightness
     chown system system /sys/class/leds/red/brightness
     chown system system /sys/class/leds/green/brightness
     chown system system /sys/class/leds/blue/brightness
@@ -414,6 +417,15 @@ on boot
     chown system system /sys/kernel/ipv4/tcp_rmem_def
     chown system system /sys/kernel/ipv4/tcp_rmem_max
     chown root radio /proc/cmdline
+
+#weijin.wen@t2mobile.com modfiy /proc/cmdline file permissions (0440->0444),in order to be able to read the file.
+    chmod 0444 /proc/cmdline
+#weijin.wen@t2mobile.com modfiy /proc/cmdline file permissions (0440->0444),in order to be able to read the file.
+
+	#NFC
+	setprop ro.nfc.prot "I2C"
+	chmod 0777 /dev/pn544
+	chown nfc nfc /dev/pn544
 
     # Define default initial receive window size in segments.
     setprop net.tcp.default_init_rwnd 60
