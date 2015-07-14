@@ -327,6 +327,7 @@ on post-fs-data
     # Set indication (checked by vold) that we have finished this action
     #setprop vold.post_fs_data_done 1
 
+
 	mkdir /data/nfc
 	mkdir /etc/param
 on boot
@@ -417,6 +418,9 @@ on boot
     chown system system /sys/kernel/ipv4/tcp_rmem_def
     chown system system /sys/kernel/ipv4/tcp_rmem_max
     chown root radio /proc/cmdline
+
+	chmod 0777 /dev/st480
+	chown system system /dev/st480
 
 #weijin.wen@t2mobile.com modfiy /proc/cmdline file permissions (0440->0444),in order to be able to read the file.
     chmod 0444 /proc/cmdline
